@@ -16,6 +16,7 @@
   "eslintConfig": {
     "extends": "react-app"
   },
+  "proxy": "https://findfalcone.herokuapp.com/",
   "browserslist": [
     ">0.2%",
     "not dead",
