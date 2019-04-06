@@ -57,10 +57,10 @@ export function getVehiclesByDestination(selectedPlanet, planets, vehicles) {
 }
 
 export function getTimeTaken(state){
-  const { d1, d2, d3, d4, dr1, dr2, dr3, dr4, planets, vehicles} = state;
+  const { search, planets, vehicles} = state;
 
-  const dList = [d1, d2, d3, d4]
-  const  drList = [dr1, dr2, dr3, dr4]
+  const dList = map(search, travel => travel.planet_name)
+  const  drList = map(search, travel => travel.vehicle)
   let timeTaken = 0;
 
   drList.forEach((dr, i)=> {

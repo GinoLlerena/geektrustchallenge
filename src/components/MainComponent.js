@@ -8,16 +8,21 @@ import filter from 'lodash/filter'
 import includes from 'lodash/includes'
 import {getPlanets, getVehiclesByDestination, getVehicles, getTimeTaken} from '../utils/Utils'
 
+function getAvailablePlanets(planets, search,  idx1, idx2, idx3) {
+  return filter(planets, planet => !includes([search[idx1].planet_name,search[idx2].planet_name,search[idx3].planet_name], planet.value))
+}
+
+function travel() {
+  return {planet_name:'', vehicle:''}
+}
+
+function initSearch(){
+  return[travel(), travel(), travel(), travel()]
+}
+
 function initState() {
   return({
-    d1: '',
-    d2: '',
-    d3: '',
-    d4: '',
-    dr1: '',
-    dr2: '',
-    dr3: '',
-    dr4: '',
+    search: initSearch(),
     planets: [],
     vehicles: [],
     main: true
@@ -42,7 +47,7 @@ const MyDestination = (props) => {
         <MySelect description={selectDescription} selectedValue={selectSelectedValue} handleChange={onChangeSelect}
                   readOnly={false} formElementValues={selectElements}/>
 
-        {selectSelectedValue && <RadioElement radioKey={radioKey} currentValue={radioSelectedValue} handleChange={onChangeRadio} readOnly={false}
+        {selectSelectedValue && <RadioElement parentId={selectSelectedValue} radioKey={radioKey} currentValue={radioSelectedValue} handleChange={onChangeRadio} readOnly={false}
                       formElementValues={radioElements}/>}
       </div>
     </div>
@@ -55,9 +60,9 @@ class MainComponent extends Component {
 
   state = initState()
 
-  handleChange = (key, value) => {
+  handleChange = (index, key, value) => {
 
-    if(includes(['dr1','dr2','dr3','dr4'], key)){
+    if(key === 'vehicle'){
       const vehicles = map(this.state.vehicles, vehicle => {
         if(vehicle.value === value){
           vehicle.total_no = vehicle.total_no - 1
@@ -65,10 +70,10 @@ class MainComponent extends Component {
         return vehicle
       })
 
-      this.setState({[key]: value, vehicles})
+      this.setState(({search}) => ({vehicles, search: (map(search, (travel, i) => (i === index )? {...travel, [key]: value} : travel))}))
     }
     else
-      this.setState({[key]: value})
+      this.setState(({search}) => ({search: (map(search, (travel, i) => (i === index )? {...travel, [key]: value} : travel))}))
   }
 
   onGetPlanets = () => {
@@ -84,16 +89,22 @@ class MainComponent extends Component {
   }
 
   onFindFalcone = () => {
-    const {d1, d2, d3, d4, dr1, dr2, dr3, dr4, main} = this.state
+    const { main, search} = this.state
+
+    const planet_names = map(search, travel => travel.planet_name)
+    const vehicle_names = map(search, travel => travel.vehicle)
+
     if(main) {
       Service.getToken().then(token => {
-        Service.findFalcone(token.token, [d1, d2, d3, d4], [dr1, dr2, dr3, dr4]).then(e => {
+        Service.findFalcone(token.token, planet_names, vehicle_names).then(e => {
           const {status, planet_name} = e;
           this.setState({status, planet_name, main: false})
         })
       })
     }else {
-      this.setState(initState())
+      this.setState({search: initSearch(), main:true})
+      this.onGetPlanets()
+      this.onGetVehicles()
     }
   }
 
@@ -103,19 +114,36 @@ class MainComponent extends Component {
   }
 
   render() {
-    const {d1, d2, d3, d4, dr1, dr2, dr3, dr4, planets, vehicles, main, status, planet_name} = this.state
+    const {search, planets, vehicles, main, status, planet_name} = this.state
 
-    const lstPlanets1 = planets && planets.length ? filter(planets, planet => !includes([d2,d3,d4], planet.value)) :[]
-    const lstPlanets2 = planets && planets.length ? filter(planets, planet => !includes([d1,d3,d4], planet.value)) :[]
-    const lstPlanets3 = planets && planets.length ? filter(planets, planet => !includes([d1,d2,d4], planet.value)) :[]
-    const lstPlanets4 = planets && planets.length ? filter(planets, planet => !includes([d1,d2,d3], planet.value)) :[]
+    const lstPlanets = planets && planets.length ? [
+      getAvailablePlanets(planets, search, 1, 2, 3),
+      getAvailablePlanets(planets, search, 0, 2,3),
+      getAvailablePlanets(planets, search, 0,1,3),
+      getAvailablePlanets(planets, search, 0,1 ,2)
+    ] : []
 
-    const getVehiclesByD1 = () => getVehiclesByDestination(d1,planets, vehicles)
-    const getVehiclesByD2 = () => getVehiclesByDestination(d2,planets, vehicles)
-    const getVehiclesByD3 = () => getVehiclesByDestination(d3,planets, vehicles)
-    const getVehiclesByD4 = () => getVehiclesByDestination(d4,planets, vehicles)
+    const lstVehicles = map(search, opt => getVehiclesByDestination(opt.planet_name,planets, vehicles))
 
     const timeTaken = getTimeTaken(this.state)
+
+    const lstOptions = map(search, (option, i) =>{
+      const _handleChange = (key, value) => this.handleChange(i, key, value)
+
+      return(
+        <div className="col-md-3">
+          <MyDestination key={i}
+                         selectDescription={`Destination ${i+1}`}
+                         selectSelectedValue={option.planet_name}
+                         handleChange={_handleChange}
+                         selectElements={lstPlanets[i]}
+                         selectKey={'planet_name'}
+                         radioKey={'vehicle'}
+                         radioSelectedValue={option.vehicle}
+                         radioElements={lstVehicles[i]}/>
+        </div>
+      )
+    })
 
     return (
       <main className='main'>
@@ -128,56 +156,7 @@ class MainComponent extends Component {
           </section>
           {main ? <section>
             <div className="row">
-              <div className="col-md-3">
-                <MyDestination selectDescription='Destination 1'
-                               selectSelectedValue={d1}
-                               handleChange={this.handleChange}
-                               selectElements={lstPlanets1}
-                               selectKey={'d1'}
-                               radioKey={'dr1'}
-                               radioSelectedValue={dr1}
-                               radioElements={getVehiclesByD1()}/>
-              </div>
-              <div className="col-md-3">
-
-                <MyDestination selectDescription='Destination 2'
-                               selectSelectedValue={d2}
-                               handleChange={this.handleChange}
-                               selectElements={lstPlanets2}
-                               selectKey={'d2'}
-                               radioKey={'dr2'}
-                               radioSelectedValue={dr2}
-                               radioElements={getVehiclesByD2()}/>
-
-
-              </div>
-              <div className="col-md-3">
-
-                <MyDestination selectDescription='Destination 3'
-                               selectSelectedValue={d3}
-                               handleChange={this.handleChange}
-                               selectElements={lstPlanets3}
-                               selectKey={'d3'}
-                               radioKey={'dr3'}
-                               radioSelectedValue={dr3}
-                               radioElements={getVehiclesByD3()}/>
-
-              </div>
-
-              <div className="col-md-3">
-
-                <MyDestination selectDescription='Destination 4'
-                               selectSelectedValue={d4}
-                               handleChange={this.handleChange}
-                               selectElements={lstPlanets4}
-                               selectKey={'d4'}
-                               radioKey={'dr4'}
-                               radioSelectedValue={dr4}
-                               radioElements={getVehiclesByD4()}/>
-
-
-              </div>
-
+              {lstOptions}
             </div>
             <div className='row'>
               <div className="col-md-4 col-md-offset-4">
